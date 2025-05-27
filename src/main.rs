@@ -1,13 +1,17 @@
-mod parser;
 mod flow_reader;
 mod mermaid;
+mod parser;
 
 use clap::{Arg, Command};
-use std::path::PathBuf;
+use crossterm::{
+    execute,
+    style::{Color, Print, ResetColor, SetForegroundColor},
+    terminal::{Clear, ClearType},
+};
 use fuzzy_matcher::FuzzyMatcher;
 use fuzzy_matcher::skim::SkimMatcherV2;
-use inquire::Text;
-
+use inquire::{Select, Text};
+use std::{io::stdout, path::PathBuf};
 
 fn main() {
     let matches = Command::new("docuflows")
@@ -29,22 +33,14 @@ fn main() {
                 .short_flag('p')
                 .long_flag("parse")
                 .about("Parse source directory and list all function names")
-                .arg(
-                    Arg::new("path")
-                        .help("Source path")
-                        .required(true),
-                ),
+                .arg(Arg::new("path").help("Source path").required(true)),
         )
         .subcommand(
             Command::new("trace")
                 .short_flag('t')
                 .long_flag("trace")
                 .about("create flow")
-                .arg(
-                    Arg::new("path")
-                        .help("Source path")
-                        .required(true),
-                ),
+                .arg(Arg::new("path").help("Source path").required(true)),
         )
         .get_matches();
 
@@ -68,6 +64,9 @@ fn main() {
 
         match search_term {
             Ok(search_term) => {
+                if search_term.is_empty() {
+                    return;
+                }
                 let matcher = SkimMatcherV2::default();
                 let mut matches = Vec::new();
 
@@ -76,9 +75,41 @@ fn main() {
                         matches.push(candidate);
                     }
                 }
-                println!("{:?}", matches);
+
+                let selected_function = Select::new("Select a starting function", matches).prompt();
+
+                match selected_function {
+                    Ok(function_name) => {
+                        let view_callers = &format!("View callers of {}", function_name);
+                        let view_called = &format!("View methods called in {}", function_name);
+                        let options: Vec<&str> =
+                            vec![view_callers, view_called, "Go back", "Cancel"];
+                        let next_step = Select::new(
+                            &format!("What would you like to do with {}?", function_name),
+                            options,
+                        )
+                        .prompt();
+
+                        match next_step {
+                            Ok(a) => println!("Next: {:?}", a),
+                            Err(e) => print_error(e),
+                        }
+                    }
+                    Err(e) => print_error(e),
+                }
             }
-            Err(_) => println!("Something bad happened")
+            Err(e) => print_error(e),
         }
     }
+}
+
+pub fn print_error<E: std::fmt::Display>(err: E) {
+    execute!(
+        stdout(),
+        Clear(ClearType::CurrentLine),
+        SetForegroundColor(Color::Red),
+        Print(format!("[Error] {}\n", err)),
+        ResetColor
+    )
+    .unwrap();
 }
