@@ -4,6 +4,10 @@ mod mermaid;
 
 use clap::{Arg, Command};
 use std::path::PathBuf;
+use fuzzy_matcher::FuzzyMatcher;
+use fuzzy_matcher::skim::SkimMatcherV2;
+use inquire::Text;
+
 
 fn main() {
     let matches = Command::new("docuflows")
@@ -31,6 +35,17 @@ fn main() {
                         .required(true),
                 ),
         )
+        .subcommand(
+            Command::new("trace")
+                .short_flag('t')
+                .long_flag("trace")
+                .about("create flow")
+                .arg(
+                    Arg::new("path")
+                        .help("Source path")
+                        .required(true),
+                ),
+        )
         .get_matches();
 
     if let Some(diagram_matches) = matches.subcommand_matches("diagram") {
@@ -42,8 +57,28 @@ fn main() {
     } else if let Some(parse_matches) = matches.subcommand_matches("parse") {
         let path = parse_matches.get_one::<String>("path").unwrap();
         let functions = parser::extract_function_names_from_dir(path);
-        for func in functions {
+        for func in &functions {
             println!("{}", func);
+        }
+    } else if let Some(trace_matches) = matches.subcommand_matches("trace") {
+        let path = trace_matches.get_one::<String>("path").unwrap();
+        let functions = parser::extract_function_names_from_dir(&path);
+        println!("Parsed {} functions from {}", &functions.len(), path);
+        let search_term = Text::new("Search for a function to start").prompt();
+
+        match search_term {
+            Ok(search_term) => {
+                let matcher = SkimMatcherV2::default();
+                let mut matches = Vec::new();
+
+                for candidate in functions {
+                    if let Some(_) = matcher.fuzzy_match(&candidate, &search_term) {
+                        matches.push(candidate);
+                    }
+                }
+                println!("{:?}", matches);
+            }
+            Err(_) => println!("Something bad happened")
         }
     }
 }
