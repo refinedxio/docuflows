@@ -1,17 +1,13 @@
 mod flow_reader;
 mod mermaid;
 mod parser;
+mod utils;
 
 use clap::{Arg, Command};
-use crossterm::{
-    execute,
-    style::{Color, Print, ResetColor, SetForegroundColor},
-    terminal::{Clear, ClearType},
-};
 use fuzzy_matcher::FuzzyMatcher;
 use fuzzy_matcher::skim::SkimMatcherV2;
 use inquire::{Select, Text};
-use std::{io::stdout, path::PathBuf};
+use std::path::PathBuf;
 
 fn main() {
     let matches = Command::new("docuflows")
@@ -92,24 +88,13 @@ fn main() {
 
                         match next_step {
                             Ok(a) => println!("Next: {:?}", a),
-                            Err(e) => print_error(e),
+                            Err(e) => utils::print_error(e),
                         }
                     }
-                    Err(e) => print_error(e),
+                    Err(e) => utils::print_error(e),
                 }
             }
-            Err(e) => print_error(e),
+            Err(e) => utils::print_error(e),
         }
     }
-}
-
-pub fn print_error<E: std::fmt::Display>(err: E) {
-    execute!(
-        stdout(),
-        Clear(ClearType::CurrentLine),
-        SetForegroundColor(Color::Red),
-        Print(format!("[Error] {}\n", err)),
-        ResetColor
-    )
-    .unwrap();
 }
